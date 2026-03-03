@@ -1,0 +1,17 @@
+{
+  "name": "barq-vweb",
+  "version": "0.1.0",
+  "description": "Browser-native vector database relying on barq-wasm and barq-db",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:all": "bash ../build.sh && tsc",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "barq-vweb-wasm": "file:./pkg"
+  }
+}

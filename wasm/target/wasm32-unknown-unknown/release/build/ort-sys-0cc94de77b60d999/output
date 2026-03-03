@@ -1,0 +1,3 @@
+cargo:rustc-check-cfg=cfg(link_error)
+cargo:rerun-if-env-changed=ORT_LIB_LOCATION
+cargo:rustc-cfg=link_error

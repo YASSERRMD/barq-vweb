@@ -1,0 +1,1 @@
+for<'a, 'b, 'c, 'd, 'e, 'f> unsafe fn(*mut OrtSession, *const OrtRunOptions, &'a [&'b str], &'c [*const OrtValue], &'d [&'e str], &'f mut [*mut OrtValue]) -> Pin<Box<(dyn Future<Output = OrtStatusPtr> + 'static)>>
