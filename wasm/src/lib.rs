@@ -8,10 +8,12 @@ pub mod compute;
 pub mod index;
 pub mod storage;
 pub mod embed;
+pub mod search;
 
 use index::{HnswIndex, PqCompressor};
 use storage::VectorEntry;
 use embed::MiniLm;
+use search::{BM25, rrf_merge};
 
 thread_local! {
     static STATE: RefCell<Option<BarqState>> = RefCell::new(None);
@@ -21,6 +23,7 @@ struct BarqState {
     collection_name: String,
     hnsw: HnswIndex,
     pq: PqCompressor,
+    bm25: BM25,
     model_url: Option<String>,
     dim: usize,
 }
@@ -60,6 +63,7 @@ impl BarqVWeb {
                         collection_name: collection.clone(),
                         hnsw: HnswIndex::new(),
                         pq: PqCompressor::new(dim),
+                        bm25: BM25::new(),
                         model_url: None,
                         dim,
                     });
@@ -99,6 +103,7 @@ impl BarqVWeb {
                         collection_name: collection.clone(),
                         hnsw: HnswIndex::new(),
                         pq: PqCompressor::new(dim),
+                        bm25: BM25::new(),
                         model_url: None,
                         dim,
                     });
@@ -107,6 +112,9 @@ impl BarqVWeb {
                     for (i, v) in embeddings.iter().enumerate() {
                         let id = (state.hnsw.len() as u64) + i as u64;
                         state.hnsw.insert(id, v.clone());
+                        if let Some(text) = text_vec.get(i) {
+                            state.bm25.add_doc(&id.to_string(), text);
+                        }
                     }
                 }
             });
@@ -133,22 +141,39 @@ impl BarqVWeb {
     }
 
     #[wasm_bindgen]
-    pub fn search(&self, query: String, top_k: usize, _hybrid: bool) -> Promise {
+    pub fn search(&self, query: String, top_k: usize, hybrid: bool) -> Promise {
         let model_url = self.model_url.clone()
             .unwrap_or_else(|| "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx".to_string());
         wasm_bindgen_futures::future_to_promise(async move {
             let mut embedder = MiniLm::new(model_url);
             embedder.init().await?;
             let query_vec = embedder.embed(&query).await?;
-            let results: Vec<SearchResult> = STATE.with(|s| {
-                let borrow = s.borrow();
-                if let Some(state) = borrow.as_ref() {
-                    state.hnsw.knn_search(&query_vec, top_k).into_iter()
-                        .map(|(id, score)| SearchResult { id: id as u32, score })
-                        .collect()
-                } else { vec![] }
-            });
-            Ok(serde_wasm_bindgen::to_value(&results).unwrap_or(JsValue::NULL))
+            if hybrid {
+                let (bm25_results, hnsw_results) = STATE.with(|s| {
+                    let borrow = s.borrow();
+                    if let Some(state) = borrow.as_ref() {
+                        let bm = state.bm25.search(&query, top_k * 2);
+                        let hnsw = state.hnsw.knn_search(&query_vec, top_k * 2)
+                            .into_iter().map(|(id, sc)| (id.to_string(), sc)).collect::<Vec<_>>();
+                        (bm, hnsw)
+                    } else { (vec![], vec![]) }
+                });
+                let merged = rrf_merge(&bm25_results, &hnsw_results);
+                let results_v: Vec<SearchResult> = merged.into_iter().take(top_k)
+                    .map(|r| SearchResult { id: r.id.parse().unwrap_or(0), score: r.score })
+                    .collect();
+                Ok(serde_wasm_bindgen::to_value(&results_v).unwrap_or(JsValue::NULL))
+            } else {
+                let results: Vec<SearchResult> = STATE.with(|s| {
+                    let borrow = s.borrow();
+                    if let Some(state) = borrow.as_ref() {
+                        state.hnsw.knn_search(&query_vec, top_k).into_iter()
+                            .map(|(id, score)| SearchResult { id: id as u32, score })
+                            .collect()
+                    } else { vec![] }
+                });
+                Ok(serde_wasm_bindgen::to_value(&results).unwrap_or(JsValue::NULL))
+            }
         })
     }
 
