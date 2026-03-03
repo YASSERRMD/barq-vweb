@@ -31,11 +31,14 @@ pub async fn probe_backend() -> Backend {
         let nav = window.navigator();
         if let Ok(gpu_val) = Reflect::get(&nav, &JsValue::from_str("gpu")) {
             if !gpu_val.is_undefined() {
-                if let Ok(gpu) = gpu_val.dyn_into::<web_sys::Gpu>() {
-                    let adapter_promise = gpu.request_adapter();
-                    if let Ok(adapter_val) = JsFuture::from(adapter_promise).await {
-                        if !adapter_val.is_null() && !adapter_val.is_undefined() {
-                            return Backend::WebGPU;
+                if let Ok(req_adapter) = Reflect::get(&gpu_val, &JsValue::from_str("requestAdapter")) {
+                    if let Ok(func) = req_adapter.dyn_into::<js_sys::Function>() {
+                        if let Ok(adapter_promise) = Reflect::apply(&func, &gpu_val, &js_sys::Array::new()) {
+                            if let Ok(adapter_val) = JsFuture::from(adapter_promise.unchecked_into::<js_sys::Promise>()).await {
+                                if !adapter_val.is_null() && !adapter_val.is_undefined() {
+                                    return Backend::WebGPU;
+                                }
+                            }
                         }
                     }
                 }
