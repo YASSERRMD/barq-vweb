@@ -1,6 +1,8 @@
 use wasm_bindgen::prelude::*;
 use js_sys::Promise;
 
+pub mod compute;
+
 #[wasm_bindgen]
 pub struct BarqVWeb {
     // Phase 1 stubs
