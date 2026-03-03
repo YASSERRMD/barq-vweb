@@ -1,1 +1,0 @@
-unsafe extern "system" fn(unsafe extern "system" fn(*mut c_void, OrtLoggingLevel, *const i8, *const i8, *const i8, *const i8), *mut c_void, OrtLoggingLevel, *const i8, *mut *mut OrtEnv) -> OrtStatusPtr

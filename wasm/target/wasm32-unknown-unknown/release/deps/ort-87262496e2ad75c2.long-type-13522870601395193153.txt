@@ -1,1 +1,0 @@
-unsafe extern "system" fn(*mut OrtThreadingOptions, Option<unsafe extern "system" fn(*const OrtCustomHandleType)>) -> OrtStatusPtr
