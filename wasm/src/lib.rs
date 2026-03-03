@@ -7,9 +7,11 @@ use std::cell::RefCell;
 pub mod compute;
 pub mod index;
 pub mod storage;
+pub mod embed;
 
 use index::{HnswIndex, PqCompressor};
 use storage::VectorEntry;
+use embed::MiniLm;
 
 thread_local! {
     static STATE: RefCell<Option<BarqState>> = RefCell::new(None);
@@ -78,8 +80,38 @@ impl BarqVWeb {
     }
 
     #[wasm_bindgen]
-    pub fn insert_texts(&self, texts: js_sys::Array, _metadata: js_sys::Array) -> Promise {
-        Promise::resolve(&JsValue::from_str("texts not yet supported without embedder"))
+    pub fn insert_texts(&self, texts: js_sys::Array, metadata: js_sys::Array) -> Promise {
+        let model_url = self.model_url.clone()
+            .unwrap_or_else(|| "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx".to_string());
+        let collection = self.collection_name.clone();
+        wasm_bindgen_futures::future_to_promise(async move {
+            let mut embedder = MiniLm::new(model_url);
+            embedder.init().await?;
+            let text_vec: Vec<String> = (0..texts.length())
+                .filter_map(|i| texts.get(i).as_string())
+                .collect();
+            let embeddings = embedder.embed_batch(&text_vec).await?;
+            let dim = 384usize;
+            STATE.with(|s| {
+                let mut borrow = s.borrow_mut();
+                if borrow.is_none() {
+                    *borrow = Some(BarqState {
+                        collection_name: collection.clone(),
+                        hnsw: HnswIndex::new(),
+                        pq: PqCompressor::new(dim),
+                        model_url: None,
+                        dim,
+                    });
+                }
+                if let Some(state) = borrow.as_mut() {
+                    for (i, v) in embeddings.iter().enumerate() {
+                        let id = (state.hnsw.len() as u64) + i as u64;
+                        state.hnsw.insert(id, v.clone());
+                    }
+                }
+            });
+            Ok(JsValue::from_f64(text_vec.len() as f64))
+        })
     }
 
     #[wasm_bindgen]
@@ -101,8 +133,23 @@ impl BarqVWeb {
     }
 
     #[wasm_bindgen]
-    pub fn search(&self, _query: String, top_k: usize, _hybrid: bool) -> Promise {
-        Promise::resolve(&JsValue::from_str("text search requires embedder (Phase 5)"))
+    pub fn search(&self, query: String, top_k: usize, _hybrid: bool) -> Promise {
+        let model_url = self.model_url.clone()
+            .unwrap_or_else(|| "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx".to_string());
+        wasm_bindgen_futures::future_to_promise(async move {
+            let mut embedder = MiniLm::new(model_url);
+            embedder.init().await?;
+            let query_vec = embedder.embed(&query).await?;
+            let results: Vec<SearchResult> = STATE.with(|s| {
+                let borrow = s.borrow();
+                if let Some(state) = borrow.as_ref() {
+                    state.hnsw.knn_search(&query_vec, top_k).into_iter()
+                        .map(|(id, score)| SearchResult { id: id as u32, score })
+                        .collect()
+                } else { vec![] }
+            });
+            Ok(serde_wasm_bindgen::to_value(&results).unwrap_or(JsValue::NULL))
+        })
     }
 
     #[wasm_bindgen]
