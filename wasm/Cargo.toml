@@ -1,0 +1,45 @@
+[package]
+name = "barq-vweb"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+getrandom = { version = "0.2", features = ["js"] }
+console_error_panic_hook = "0.1.7"
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "IdbDatabase",
+  "IdbFactory",
+  "IdbObjectStore",
+  "IdbTransaction",
+  "IdbRequest",
+  "IdbOpenDbRequest",
+  "StorageManager",
+  "FileSystemDirectoryHandle",
+  "FileSystemFileHandle",
+  "FileSystemSyncAccessHandle",
+  "FileSystemWritableFileStream",
+  "Navigator",
+  "Window",
+  "Worker",
+  "WorkerGlobalScope",
+  "console",
+  "Gpu",
+  "GpuAdapter",
+  "GpuDevice",
+  "GpuComputePipeline",
+  "GpuBuffer",
+  "Event"
+]

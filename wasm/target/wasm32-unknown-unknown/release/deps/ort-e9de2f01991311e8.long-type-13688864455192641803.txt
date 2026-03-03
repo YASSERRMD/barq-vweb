@@ -1,0 +1,1 @@
+unsafe extern "system" fn(*const OrtMemoryInfo, *mut c_void, usize, *const i64, usize, ONNXTensorElementDataType, *mut *mut OrtValue) -> OrtStatusPtr
