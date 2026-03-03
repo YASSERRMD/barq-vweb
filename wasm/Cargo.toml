@@ -40,6 +40,16 @@ features = [
   "GpuAdapter",
   "GpuDevice",
   "GpuComputePipeline",
+  "GpuPipelineLayout",
   "GpuBuffer",
+  "GpuShaderModuleDescriptor",
+  "GpuComputePipelineDescriptor",
+  "GpuProgrammableStage",
   "Event"
 ]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[[test]]
+name = "integration"
