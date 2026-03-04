@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>barq-vweb Examples</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+
+<body>
+    <header>
+        <div class="logo">⚡ barq-vweb</div>
+        <div id="backend-pill">
+            <span class="dot"></span>
+            <span id="backend-txt">Loading...</span>
+        </div>
+        <nav id="tabs">
+            <button class="tab-btn active" data-tab="text">Text Search</button>
+            <button class="tab-btn" data-tab="vector">Vector Insert</button>
+            <button class="tab-btn" data-tab="hybrid">Hybrid Search</button>
+            <button class="tab-btn" data-tab="persistence">Persistence</button>
+        </nav>
+    </header>
+
+    <main>
+        <section id="tab-text" class="tab active"></section>
+        <section id="tab-vector" class="tab"></section>
+        <section id="tab-hybrid" class="tab"></section>
+        <section id="tab-persistence" class="tab"></section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>
