@@ -1,1 +1,0 @@
-unsafe extern "system" fn(*mut OrtSessionOptions, Option<unsafe extern "system" fn(*mut c_void, unsafe extern "system" fn(*mut c_void), *mut c_void) -> *const OrtCustomHandleType>) -> OrtStatusPtr
