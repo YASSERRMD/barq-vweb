@@ -128,3 +128,33 @@ async fn test_embed_batch() {
         assert_eq!(v.len(), 384);
     }
 }
+
+// Phase 6: BM25 and hybrid search
+#[wasm_bindgen_test]
+fn test_bm25_search() {
+    use barq_vweb::search::BM25;
+    let mut bm25 = BM25::new();
+    bm25.add_doc("0", "rust is a systems programming language");
+    bm25.add_doc("1", "python is great for data science");
+    bm25.add_doc("2", "rust wasm is fast and safe");
+    let results = bm25.search("rust", 2);
+    assert!(!results.is_empty(), "BM25 must return results");
+    assert!(results[0].0 == "0" || results[0].0 == "2", "rust docs must score highest");
+}
+
+#[wasm_bindgen_test]
+fn test_rrf_merge() {
+    use barq_vweb::search::rrf_merge;
+    let bm25: Vec<(String, f32)> = vec![
+        ("a".to_string(), 1.5), ("b".to_string(), 1.0)
+    ];
+    let cosine: Vec<(String, f32)> = vec![
+        ("b".to_string(), 0.9), ("c".to_string(), 0.8)
+    ];
+    let merged = rrf_merge(&bm25, &cosine);
+    assert!(!merged.is_empty());
+    // "b" appears in both -> should score higher than "c"
+    let b_score = merged.iter().find(|r| r.id == "b").map(|r| r.score).unwrap_or(0.0);
+    let c_score = merged.iter().find(|r| r.id == "c").map(|r| r.score).unwrap_or(0.0);
+    assert!(b_score > c_score, "Shared doc must score higher via RRF");
+}
