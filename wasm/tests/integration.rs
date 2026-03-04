@@ -103,3 +103,28 @@ fn test_pq_encode_decode() {
     let decoded = pq.decode(&code);
     assert_eq!(decoded.len(), dim);
 }
+
+// Phase 5: Embedding
+#[wasm_bindgen_test]
+async fn test_embed_produces_384_dim() {
+    use barq_vweb::embed::MiniLm;
+    let mut embedder = MiniLm::new("stub://".to_string());
+    embedder.init().await.unwrap();
+    let v = embedder.embed("hello world").await.unwrap();
+    assert_eq!(v.len(), 384, "MiniLm must produce 384-dim vectors");
+    let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
+    assert!((norm - 1.0).abs() < 1e-5, "Embedding must be L2-normalized");
+}
+
+#[wasm_bindgen_test]
+async fn test_embed_batch() {
+    use barq_vweb::embed::MiniLm;
+    let mut embedder = MiniLm::new("stub://".to_string());
+    embedder.init().await.unwrap();
+    let texts = vec!["hello".to_string(), "world".to_string(), "rust".to_string()];
+    let vecs = embedder.embed_batch(&texts).await.unwrap();
+    assert_eq!(vecs.len(), 3);
+    for v in &vecs {
+        assert_eq!(v.len(), 384);
+    }
+}
