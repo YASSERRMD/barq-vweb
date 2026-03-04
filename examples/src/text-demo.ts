@@ -1,4 +1,4 @@
-import { getWasm, makeDB, el, setStatus } from './shared';
+import { getWasm, makeDB, embedTexts, el, setStatus } from './shared';
 
 const SAMPLE_TEXTS = [
     'Rust is a systems programming language focused on safety and performance.',
@@ -18,10 +18,10 @@ export function mountTextDemo(root: HTMLElement) {
     <div class="card">
       <div class="card-title">📥 Add Documents</div>
       <div class="input-row">
-        <input type="text" id="td-input" placeholder="Enter text to store..." />
+        <input type="text" id="td-input" placeholder="Enter text to store…" />
         <button class="btn" id="td-store">Store</button>
       </div>
-      <p class="status" id="td-store-status"></p>
+      <p class="status" id="td-store-status">⏳ Model loading in background…</p>
       <div style="margin-top:.75rem;display:flex;gap:.5rem;flex-wrap:wrap">
         <button class="btn btn-sm" id="td-load-samples">Load 10 samples</button>
         <button class="btn btn-sm" id="td-clear">Clear all</button>
@@ -29,9 +29,9 @@ export function mountTextDemo(root: HTMLElement) {
     </div>
 
     <div class="card">
-      <div class="card-title">🔍 Semantic Search</div>
+      <div class="card-title">🔍 Semantic Search (MiniLM-L6-v2)</div>
       <div class="input-row">
-        <input type="text" id="td-query" placeholder="Search stored documents..." />
+        <input type="text" id="td-query" placeholder="Search stored documents…" />
         <button class="btn" id="td-search">Search</button>
       </div>
       <p class="status" id="td-search-status"></p>
@@ -58,7 +58,9 @@ export function mountTextDemo(root: HTMLElement) {
     const countPill = root.querySelector<HTMLElement>('#td-count')!;
 
     let db: any = null;
-    let docs: string[] = [];
+    const docs: string[] = [];
+    // Store embeddings locally so we can display matched text
+    const embeddings: Float32Array[] = [];
 
     async function getDb() {
         if (db) return db;
@@ -79,9 +81,16 @@ export function mountTextDemo(root: HTMLElement) {
 
     async function storeText(text: string) {
         if (!text.trim()) return;
+        // 1. Embed with real MiniLM
+        const [vec] = await embedTexts([text]);
+        // 2. Insert into HNSW via barq-vweb
         const instance = await getDb();
+        const id = docs.length;
+        const flatArr = vec;
+        const ids = new Uint32Array([id]);
+        await instance.insert_vectors(flatArr, ids, 384);
         docs.push(text);
-        await instance.insert_texts([text], []);
+        embeddings.push(vec);
         setStatus(storeStatus, `✅ Stored: "${text.slice(0, 50)}"`, 'ok');
         refreshDocs();
     }
@@ -91,6 +100,7 @@ export function mountTextDemo(root: HTMLElement) {
         if (!text) return;
         try {
             storeBtn.disabled = true;
+            setStatus(storeStatus, '⏳ Embedding…', '');
             await storeText(text);
             input.value = '';
         } catch (e: any) {
@@ -100,10 +110,23 @@ export function mountTextDemo(root: HTMLElement) {
 
     samplesBtn.addEventListener('click', async () => {
         samplesBtn.disabled = true;
-        setStatus(storeStatus, '⏳ Loading 10 sample documents...', '');
+        setStatus(storeStatus, '⏳ Embedding 10 samples…', '');
         try {
-            for (const t of SAMPLE_TEXTS) await storeText(t);
-            setStatus(storeStatus, '✅ 10 samples loaded', 'ok');
+            // Batch embed all samples at once for speed
+            const vecs = await embedTexts(SAMPLE_TEXTS);
+            const instance = await getDb();
+            const baseId = docs.length;
+            const flatArr = new Float32Array(SAMPLE_TEXTS.length * 384);
+            const ids = new Uint32Array(SAMPLE_TEXTS.length);
+            for (let i = 0; i < SAMPLE_TEXTS.length; i++) {
+                flatArr.set(vecs[i], i * 384);
+                ids[i] = baseId + i;
+                docs.push(SAMPLE_TEXTS[i]);
+                embeddings.push(vecs[i]);
+            }
+            await instance.insert_vectors(flatArr, ids, 384);
+            setStatus(storeStatus, '✅ 10 samples embedded and stored', 'ok');
+            refreshDocs();
         } catch (e: any) {
             setStatus(storeStatus, `❌ ${e.message}`, 'err');
         } finally { samplesBtn.disabled = false; }
@@ -114,7 +137,8 @@ export function mountTextDemo(root: HTMLElement) {
             const instance = await getDb();
             await instance.clear();
             db = null;
-            docs = [];
+            docs.length = 0;
+            embeddings.length = 0;
             refreshDocs();
             resultsList.innerHTML = '';
             setStatus(storeStatus, '✅ Cleared', 'ok');
@@ -126,12 +150,15 @@ export function mountTextDemo(root: HTMLElement) {
         if (!query) return;
         try {
             searchBtn.disabled = true;
-            setStatus(searchStatus, '🔍 Searching...', '');
+            setStatus(searchStatus, '⏳ Embedding query…', '');
             resultsList.innerHTML = '';
+            const [queryVec] = await embedTexts([query]);
             const instance = await getDb();
-            const raw = await instance.search(query, 5, false);
-            const results: Array<{ id: number; score: number }> = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (!results || !results.length) {
+            setStatus(searchStatus, '🔍 Searching…', '');
+            const raw = await instance.search_vector(queryVec, 5);
+            const results: Array<{ id: number; score: number }> =
+                typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (!results?.length) {
                 setStatus(searchStatus, 'No results. Store some documents first.', '');
                 return;
             }
@@ -152,8 +179,6 @@ export function mountTextDemo(root: HTMLElement) {
 
     input.addEventListener('keydown', e => { if (e.key === 'Enter') storeBtn.click(); });
     queryInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchBtn.click(); });
-
-    // Initial state
     refreshDocs();
 }
 
