@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>barq-vweb · Browser-Native Vector DB</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --accent: #7c3aed;
+    --accent2: #2563eb;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #10b981;
+    --red: #ef4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    padding: 1.5rem;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+  h1 { font-size: 1.6rem; font-weight: 700; background: linear-gradient(135deg, #7c3aed, #2563eb); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  #backend-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    padding: .35rem .85rem;
+    font-size: .8rem;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  #backend-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .panel h2 { font-size: 1rem; font-weight: 600; color: var(--muted); margin-bottom: 1rem; letter-spacing: .05em; text-transform: uppercase; }
+  .input-row { display: flex; gap: .75rem; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: .6rem;
+    padding: .65rem 1rem;
+    color: var(--text);
+    font-size: .95rem;
+    outline: none;
+    transition: border .2s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  button {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none;
+    border-radius: .6rem;
+    padding: .65rem 1.4rem;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  button:hover { opacity: .88; transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+
+  #messages-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-bottom: 1rem;
+  }
+  .msg {
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    border-radius: .4rem;
+    padding: .5rem .8rem;
+    font-size: .88rem;
+    color: var(--text);
+    animation: fadein .3s ease;
+  }
+  @keyframes fadein { from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;} }
+
+  #results-list {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: .6rem;
+    padding: .6rem 1rem;
+    font-size: .88rem;
+    animation: fadein .2s ease;
+  }
+  .result-text { flex: 1; }
+  .result-score {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 60px;
+    text-align: right;
+  }
+
+  #count-badge {
+    font-size: .78rem;
+    color: var(--muted);
+    margin-bottom: .8rem;
+  }
+
+  .status-msg { font-size: .8rem; color: var(--muted); margin-top: .5rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ barq-vweb</h1>
+  <div id="backend-badge">
+    <span class="dot"></span>
+    <span id="backend-label">Initializing...</span>
+  </div>
+</header>
+
+<div class="panel">
+  <h2>📥 Store Messages</h2>
+  <div class="input-row">
+    <input type="text" id="msg-input" placeholder="Type a message to store..." />
+    <button id="store-btn">Store</button>
+  </div>
+  <p class="status-msg" id="store-status"></p>
+  <div id="count-badge">Stored: 0 items</div>
+  <div id="messages-list"></div>
+</div>
+
+<div class="panel">
+  <h2>🔍 Semantic Search</h2>
+  <div class="input-row">
+    <input type="text" id="search-input" placeholder="Search your stored messages..." />
+    <button id="search-btn">Search</button>
+  </div>
+  <p class="status-msg" id="search-status"></p>
+  <div id="results-list"></div>
+</div>
+
+<script type="module">
+  // Dynamically import the barq-vweb WASM package
+  let db = null;
+  let BarqVWeb = null;
+  const messages = [];
+
+  async function init() {
+    try {
+      const mod = await import('./pkg/barq_vweb.js');
+      await mod.default();
+      BarqVWeb = mod.BarqVWeb;
+      db = new BarqVWeb('demo', null);
+      document.getElementById('backend-label').textContent = db.backend_info();
+      document.getElementById('store-status').textContent = '✅ Ready';
+    } catch(e) {
+      document.getElementById('backend-label').textContent = 'Error';
+      document.getElementById('store-status').textContent = `Init error: ${e.message}`;
+    }
+  }
+
+  document.getElementById('store-btn').onclick = async () => {
+    if(!db) return;
+    const text = document.getElementById('msg-input').value.trim();
+    if(!text) return;
+    messages.push(text);
+    try {
+      const arr = [text];
+      await db.insert_texts(arr, []);
+      document.getElementById('msg-input').value = '';
+      document.getElementById('store-status').textContent = `✅ Stored "${text.slice(0,40)}"`;
+      document.getElementById('count-badge').textContent = `Stored: ${db.count()} items`;
+      const div = document.createElement('div');
+      div.className = 'msg';
+      div.textContent = text;
+      document.getElementById('messages-list').prepend(div);
+    } catch(e) {
+      document.getElementById('store-status').textContent = `Error: ${e.message}`;
+    }
+  };
+
+  document.getElementById('search-btn').onclick = async () => {
+    if(!db) return;
+    const query = document.getElementById('search-input').value.trim();
+    if(!query) return;
+    document.getElementById('search-status').textContent = '🔍 Searching...';
+    document.getElementById('results-list').innerHTML = '';
+    try {
+      const results = await db.search(query, 5, true);
+      const parsed = typeof results === 'string' ? JSON.parse(results) : results;
+      if (!parsed || !parsed.length) {
+        document.getElementById('search-status').textContent = 'No results found.';
+        return;
+      }
+      document.getElementById('search-status').textContent = `Found ${parsed.length} result(s)`;
+      for(const r of parsed.slice(0,5)) {
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        const textEl = document.createElement('div');
+        textEl.className = 'result-text';
+        textEl.textContent = messages[r.id] ?? `[id:${r.id}]`;
+        const scoreEl = document.createElement('div');
+        scoreEl.className = 'result-score';
+        scoreEl.textContent = (r.score * 100).toFixed(1) + '%';
+        div.appendChild(textEl);
+        div.appendChild(scoreEl);
+        document.getElementById('results-list').appendChild(div);
+      }
+    } catch(e) {
+      document.getElementById('search-status').textContent = `Error: ${e.message}`;
+    }
+  };
+
+  // Enter key support
+  document.getElementById('msg-input').onkeydown = e => { if(e.key==='Enter') document.getElementById('store-btn').click(); };
+  document.getElementById('search-input').onkeydown = e => { if(e.key==='Enter') document.getElementById('search-btn').click(); };
+
+  init();
+</script>
+</body>
+</html>
