@@ -1,5 +1,9 @@
 /wasm/target/
+/wasm/pkg/
 /js/node_modules/
 /js/dist/
 /js/pkg/
+/examples/node_modules/
+/examples/dist/
+node_modules/
 .DS_Store
