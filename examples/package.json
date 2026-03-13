@@ -17,6 +17,7 @@
         "vite-plugin-wasm": "^3.5.0"
     },
     "dependencies": {
+        "@huggingface/transformers": "^3.8.1",
         "barq-vweb": "file:../wasm/pkg"
     }
 }
