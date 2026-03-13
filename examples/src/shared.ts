@@ -1,21 +1,22 @@
 // Shared barq-vweb WASM loader — single instance across demos
-let _mod: any = null;
-let _initPromise: Promise<any> | null = null;
+// vite-plugin-wasm handles the .wasm binary serving and top-level-await
+import init, { BarqVWeb as BarqVWebImpl } from 'barq-vweb';
 
-export async function getWasm(): Promise<any> {
-    if (_mod) return _mod;
-    if (_initPromise) return _initPromise;
-    _initPromise = (async () => {
-        const mod = await import('barq-vweb');
-        await (mod as any).default?.();
-        _mod = mod;
-        return mod;
-    })();
-    return _initPromise;
+let _ready = false;
+let _initPromise: Promise<void> | null = null;
+
+export async function getWasm(): Promise<{ BarqVWeb: typeof BarqVWebImpl }> {
+    if (!_ready) {
+        if (!_initPromise) {
+            _initPromise = init().then(() => { _ready = true; });
+        }
+        await _initPromise;
+    }
+    return { BarqVWeb: BarqVWebImpl };
 }
 
-export function makeDB(mod: any, collectionName: string): any {
-    return new mod.BarqVWeb(collectionName, null);
+export function makeDB(mod: { BarqVWeb: typeof BarqVWebImpl }, collectionName: string): InstanceType<typeof BarqVWebImpl> {
+    return new mod.BarqVWeb(collectionName, undefined);
 }
 
 // ── DOM helpers ──────────────────────────────────────────────

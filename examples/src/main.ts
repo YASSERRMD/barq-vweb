@@ -1,8 +1,10 @@
 import './style.css';
+import { getWasm } from './shared';
 import { mountTextDemo } from './text-demo';
 import { mountVectorDemo } from './vector-demo';
 import { mountHybridDemo } from './hybrid-demo';
 import { mountPersistenceDemo } from './persistence-demo';
+
 
 // ── Tab routing ──────────────────────────────────────────────
 const tabs = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
@@ -22,10 +24,9 @@ tabs.forEach(btn => {
 async function initBackendBadge() {
     const el = document.getElementById('backend-txt')!;
     try {
-        const mod = await import('barq-vweb');
-        await (mod as any).default();
-        const db = new (mod as any).BarqVWeb('_probe', null);
-        el.textContent = db.backend_info?.() ?? 'WASM/Scalar';
+        const { BarqVWeb } = await getWasm();
+        const db = new BarqVWeb('_probe', undefined);
+        el.textContent = (db as any).backend_info?.() ?? 'WASM/Scalar';
         document.getElementById('backend-pill')!.style.borderColor = '#10b981';
     } catch (e) {
         el.textContent = 'Init failed';
