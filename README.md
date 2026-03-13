@@ -4,7 +4,7 @@
 
 # barq-vweb
 
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![WASM](https://img.shields.io/badge/WASM-Ready-green.svg)](https://webassembly.org/)
 [![SIMD](https://img.shields.io/badge/SIMD-Accelerated-orange.svg)](https://github.com/YASSERRMD/barq-wasm)
 
@@ -121,4 +121,4 @@ npm run dev
 
 ## License
 
-Dual-licensed under [MIT](LICENSE) or [Apache-2.0](LICENSE).
+Licensed under [MIT](LICENSE).

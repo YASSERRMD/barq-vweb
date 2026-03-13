@@ -1,6 +1,7 @@
 {
     "name": "barq-vweb-examples",
     "version": "1.0.0",
+    "license": "MIT",
     "private": true,
     "description": "Interactive demo app for barq-vweb browser-native vector DB",
     "type": "module",
