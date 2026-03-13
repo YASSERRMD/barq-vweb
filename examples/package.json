@@ -18,6 +18,7 @@
     },
     "dependencies": {
         "@huggingface/transformers": "^3.8.1",
-        "barq-vweb": "file:../wasm/pkg"
+        "barq-vweb": "file:../wasm/pkg",
+        "barq-wasm": "file:../barq-wasm/pkg"
     }
 }

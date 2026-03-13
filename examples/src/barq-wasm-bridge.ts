@@ -1,54 +1,35 @@
 /**
  * barq-wasm bridge
- * Dynamically loads barq-wasm from npm / local pkg and exposes
- * cosine_similarity_simd and dot_product_simd for use as the HNSW
- * distance kernel inside barq-vweb.
+ * Uses barq-wasm SIMD-accelerated kernels from the local pkg build.
+ * key exports: cosine_similarity_simd, dot_product_simd, vector_norm_simd
  *
- * Falls back to pure JS if barq-wasm is unavailable.
+ * Falls back to pure JS if barq-wasm init fails.
  */
 
-const BARQ_WASM_PKG = '../../barq-wasm/pkg/barq_wasm.js';
+import initBarqWasm, {
+    cosine_similarity_simd as _cosine,
+    dot_product_simd as _dot,
+    vector_norm_simd as _norm,
+} from 'barq-wasm';
 
-interface BarqWasmAPI {
-    cosine_similarity_simd: (a: Float32Array, b: Float32Array) => number;
-    dot_product_simd: (a: Float32Array, b: Float32Array) => number;
-    vector_normalize: (a: Float32Array) => Float32Array;
-}
-
-let _api: BarqWasmAPI | null = null;
-let _initPromise: Promise<BarqWasmAPI | null> | null = null;
+let _ready = false;
+let _initPromise: Promise<void> | null = null;
 
 /**
- * Try to load barq-wasm SIMD kernels.
- * Returns API if successful, null if unavailable (falls back to JS).
+ * Initialize barq-wasm SIMD kernels.
+ * Returns true if SIMD is available, false if fallback.
  */
-export async function loadBarqWasm(): Promise<BarqWasmAPI | null> {
-    if (_api) return _api;
-    if (_initPromise) return _initPromise;
-
-    _initPromise = (async () => {
-        try {
-            // First try the local barq-wasm pkg if the user has it built
-            const mod = await import(/* @vite-ignore */ BARQ_WASM_PKG);
-            if (mod.default) await mod.default();       // init()
-
-            if (typeof mod.cosine_similarity_simd === 'function') {
-                _api = {
-                    cosine_similarity_simd: mod.cosine_similarity_simd,
-                    dot_product_simd: mod.dot_product_simd,
-                    vector_normalize: mod.vector_normalize,
-                };
-                console.info('[barq-wasm] SIMD kernels loaded ✅');
-                return _api;
-            }
-        } catch {
-            /* barq-wasm not available locally */
-        }
-        console.info('[barq-wasm] not available, using JS fallback');
-        return null;
-    })();
-
-    return _initPromise;
+export async function loadBarqWasm(): Promise<boolean> {
+    if (_ready) return true;
+    if (!_initPromise) {
+        _initPromise = initBarqWasm()
+            .then(() => { _ready = true; })
+            .catch(e => {
+                console.warn('[barq-wasm] init failed, using JS fallback:', e);
+            });
+    }
+    await _initPromise;
+    return _ready;
 }
 
 // ── Scalar JS fallbacks ──────────────────────────────────────
@@ -66,27 +47,25 @@ function jsNorm(a: Float32Array): number {
 }
 
 /**
- * Compute cosine similarity — uses barq-wasm SIMD if available.
+ * Cosine similarity — uses barq-wasm 16-wide SIMD kernel when available.
  */
 export async function cosineSim(a: Float32Array, b: Float32Array): Promise<number> {
-    const api = await loadBarqWasm();
-    if (api) return api.cosine_similarity_simd(a, b);
+    if (_ready) return _cosine(a, b);
     const denom = jsNorm(a) * jsNorm(b);
     return denom < 1e-9 ? 0 : jsDot(a, b) / denom;
 }
 
 /**
- * Compute dot product — uses barq-wasm SIMD if available.
+ * Dot product — uses barq-wasm 16-wide SIMD kernel when available.
  */
 export async function dotProduct(a: Float32Array, b: Float32Array): Promise<number> {
-    const api = await loadBarqWasm();
-    if (api) return api.dot_product_simd(a, b);
+    if (_ready) return _dot(a, b);
     return jsDot(a, b);
 }
 
 /**
- * Returns a human-readable string describing the active backend.
+ * Human-readable backend label.
  */
 export function backendLabel(): string {
-    return _api ? '⚡ barq-wasm (SIMD)' : 'JS Scalar Fallback';
+    return _ready ? '⚡ barq-wasm (SIMD)' : 'JS Scalar Fallback';
 }
