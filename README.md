@@ -1,4 +1,8 @@
-# ⚡ barq-vweb
+<p align="center">
+  <img src="logo.png" width="200" alt="barq-vweb logo">
+</p>
+
+# barq-vweb
 
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 [![WASM](https://img.shields.io/badge/WASM-Ready-green.svg)](https://webassembly.org/)
@@ -8,7 +12,7 @@
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -31,7 +35,7 @@ graph TD
     HNSW --> Store
 ```
 
-## 🚀 Key Features
+## Key Features
 
 - **Self-Contained Embeddings:** Integrated `all-MiniLM-L6-v2` via Transformers.js—runs in a Web Worker to keep your UI fluid.
 - **Elite Indexing:** Professional HNSW implementation ported from [barq-db](https://github.com/YASSERRMD/barq-db) for sub-linear query times.
@@ -41,7 +45,7 @@ graph TD
 
 ---
 
-## 🏎 Quickstart
+## Quickstart
 
 ### Installation
 
@@ -71,7 +75,7 @@ console.log(results);
 
 ---
 
-## 📊 Performance Benchmarks
+## Performance Benchmarks
 
 | Operation             | barq-vweb (SIMD) | Voy    | Voy (JS) | EdgeVec |
 |-----------------------|------------------|--------|----------|---------|
@@ -84,7 +88,7 @@ console.log(results);
 
 ---
 
-## 💻 Browser Support
+## Browser Support
 
 | Technology   | Chrome   | Firefox  | Safari   | Edge     |
 |--------------|----------|----------|----------|----------|
@@ -95,7 +99,7 @@ console.log(results);
 
 ---
 
-## 🛠 Building from Source
+## Building from Source
 
 Ensure you have [Rust](https://rustup.rs/) and `wasm-pack` installed.
 
@@ -115,6 +119,6 @@ npm run dev
 
 ---
 
-## ⚖️ License
+## License
 
 Dual-licensed under [MIT](LICENSE) or [Apache-2.0](LICENSE).
